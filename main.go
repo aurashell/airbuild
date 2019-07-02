@@ -28,6 +28,7 @@ func main() {
 
   os.Setenv("PKG_CONFIG_PATH", path.Join(cwd, "airbuild-prefix", "lib", "pkgconfig") + ":" + os.Getenv("PKG_CONFIG_PATH"))
   os.Setenv("LD_LIBRARY_PATH", path.Join(cwd, "airbuild-prefix", "lib") + ":" + os.Getenv("LD_LIBRARY_PATH"))
+  os.Setenv("LIBRARY_PATH", path.Join(cwd, "airbuild-prefix", "lib") + ":" + os.Getenv("LIBRARY_PATH"))
   os.Setenv("PATH", path.Join(cwd, "airbuild-prefix", "bin") + ":" + os.Getenv("PATH"))
 
   if _, err := os.Stat(junkdir); os.IsNotExist(err) {
