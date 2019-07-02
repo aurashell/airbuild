@@ -140,91 +140,140 @@ func (r *Repository) Load() {
 		}
 
 		var buildSteps []Step
+		var rebuildSteps []Step
 
 		if tool == "autotools" {
 			autogen := path.Join(where, "autogen.sh")
 			configure := path.Join(where, "configure")
 			makefile := path.Join(where, "Makefile")
 			build0lock := path.Join(cwd, "airbuild-prefix", name + ".build0lock")
+			
+			autogenstep := Step{
+				Wants: []string{autogen},
+				Commands: []string{
+					autogen,
+				},
+			}
+			
+			configurestep := Step{
+				Wants: []string{configure},
+				Commands: []string{
+					configure + " --prefix=" + path.Join(cwd, "airbuild-prefix"),
+				},
+			}
+
+			makestep := Step{
+				Wants: []string{makefile},
+				Commands: []string{
+					"make -j" + strconv.Itoa(cores*2),
+					"touch " + build0lock,
+				},
+			}
+
+			installstep := Step{
+				Wants: []string{build0lock},
+				Commands: []string{
+					"make install",
+					"touch " + path.Join(cwd, "airbuild-prefix", name + ".buildlock"),
+				},
+			}
+
 			buildSteps = []Step{
-				Step{
-					Wants: []string{autogen},
-					Commands: []string{
-						autogen,
-					},
-				},
-				Step{
-					Wants: []string{configure},
-					Commands: []string{
-						configure + " --prefix=" + path.Join(cwd, "airbuild-prefix"),
-					},
-				},
-				Step{
-					Wants: []string{makefile},
-					Commands: []string{
-						"make -j" + strconv.Itoa(cores),
-						"touch " + build0lock,
-					},
-				},
-				Step{
-					Wants: []string{build0lock},
-					Commands: []string{
-						"make install",
-						"touch " + path.Join(cwd, "airbuild-prefix", name + ".buildlock"),
-					},
-				},
+				autogenstep,
+				configurestep,
+				makestep,
+				installstep,
+			}
+
+			rebuildSteps = []Step{
+				configurestep,
+				makestep,
+				installstep,
 			}
 		} else if tool == "cmake" {
 			cmakelists := path.Join(where, "CMakeLists.txt")
 			makefile := path.Join(bd, "Makefile")
 			build0lock := path.Join(cwd, "airbuild-prefix", name + ".build0lock")
+			
+			cmakestep := Step{
+				Wants: []string{cmakelists},
+				Commands: []string{
+					"cmake " + where + " -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=" + path.Join(cwd, "airbuild-prefix"),
+				},
+			}
+
+			makestep := Step{
+				Wants: []string{makefile},
+				Commands: []string{
+					"make -j" + strconv.Itoa(cores*2),
+					"touch " + path.Join(cwd, "airbuild-prefix", name + ".build0lock"),
+				},
+			}
+			
+			installstep := Step{
+				Wants: []string{build0lock},
+				Commands: []string{
+					"make install",
+					"touch " + path.Join(cwd, "airbuild-prefix", name + ".buildlock"),
+				},
+			}
+
 			buildSteps = []Step{
-				Step{
-					Wants: []string{cmakelists},
-					Commands: []string{
-						"cmake " + where + " -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=" + path.Join(cwd, "airbuild-prefix"),
-					},
-				},
-				Step{
-					Wants: []string{makefile},
-					Commands: []string{
-						"make -j" + strconv.Itoa(cores),
-						"touch " + path.Join(cwd, "airbuild-prefix", name + ".build0lock"),
-					},
-				},
-				Step{
-					Wants: []string{build0lock},
-					Commands: []string{
-						"make install",
-						"touch " + path.Join(cwd, "airbuild-prefix", name + ".buildlock"),
-					},
-				},
+				cmakestep,
+				makestep,
+				installstep,
+			}
+
+			rebuildSteps = []Step{
+				cmakestep,
+				makestep,
+				installstep,
 			}
 		} else if tool == "meson" {
 			mesonbuild := path.Join(where, "meson.build")
 			buildninja := path.Join(bd, "build.ninja")
 			build0lock := path.Join(cwd, "airbuild-prefix", name + ".build0lock")
+			
+			mesonstep := Step{
+				Wants: []string{mesonbuild},
+				Commands: []string{
+					"meson " + where + " --buildtype=release --prefix " + path.Join(cwd, "airbuild-prefix"),
+				},
+			}
+
+			remesonstep := Step{
+				Wants: []string{mesonbuild},
+				Commands: []string{
+					"meson --reconfigure . " + where + " --buildtype=release --prefix " + path.Join(cwd, "airbuild-prefix"),
+				},
+			}
+
+			ninjastep := Step{
+				Wants: []string{buildninja},
+				Commands: []string{
+					"ninja",
+					"touch " + build0lock,
+				},
+			}
+
+			installstep := Step{
+				Wants: []string{build0lock},
+				Commands: []string{
+					"ninja install",
+					"touch " + path.Join(cwd, "airbuild-prefix", name + ".buildlock"),
+				},
+			}
+
 			buildSteps = []Step{
-				Step{
-					Wants: []string{mesonbuild},
-					Commands: []string{
-						"meson " + where + " --buildtype=release --prefix " + path.Join(cwd, "airbuild-prefix"),
-					},
-				},
-				Step{
-					Wants: []string{buildninja},
-					Commands: []string{
-						"ninja",
-						"touch " + build0lock,
-					},
-				},
-				Step{
-					Wants: []string{build0lock},
-					Commands: []string{
-						"ninja install",
-						"touch " + path.Join(cwd, "airbuild-prefix", name + ".buildlock"),
-					},
-				},
+				mesonstep,
+				ninjastep,
+				installstep,
+			}
+
+			rebuildSteps = []Step{
+				remesonstep,
+				ninjastep,
+				installstep,
 			}
 		}
 
@@ -238,6 +287,7 @@ func (r *Repository) Load() {
 			BuildDir: bd,
 			GetSteps: getSteps,
 			BuildSteps: buildSteps,
+			RebuildSteps: rebuildSteps,
 			NoTouch: false,
 		}
 
@@ -331,7 +381,7 @@ func (r *Repository) Setup(name string) {
   if err != nil {
     log.Panic(err)
   }
-	if _, err := os.Stat(path.Join(cwd, "airbuild-prefix", name + ".buildlock")); os.IsNotExist(err) || findInStringSlice(r.Wants, name) {
+	if _, err := os.Stat(path.Join(cwd, "airbuild-prefix", name + ".buildlock")); os.IsNotExist(err) {
 		log.WithFields(log.Fields{"Package": name}).Info("Setting up a package")
 		useStep := func(i int, useStep interface{}) {
 			log.Info(pkg.BuildSteps[i])
@@ -354,6 +404,27 @@ func (r *Repository) Setup(name string) {
 			}
 		}
 		useStep(len(pkg.BuildSteps)-1, useStep);
+	} else if findInStringSlice(r.Wants, name) {
+		log.WithFields(log.Fields{"Package": name}).Info("(Re)Setting up a package")
+		useStep := func(i int, useStep interface{}) {
+			check := func() bool {
+				for _, w := range pkg.RebuildSteps[i].Wants {
+					if _, err := os.Stat(w); os.IsNotExist(err) {
+						return false
+					}
+				}
+				return true
+			}
+			if !check() {
+				log.WithFields(log.Fields{"Package": name}).Panic("Cannot (re)set up a package")
+			}
+			for _, cmd := range pkg.RebuildSteps[i].Commands {
+				runCommand(cmd, pkg.BuildDir)
+			}
+		}
+		for s := range pkg.RebuildSteps {
+			useStep(s, useStep)
+		}
 	}
 }
 
