@@ -1,13 +1,14 @@
 package main
 
 import (
+	"encoding/json"
 	"os"
 	"os/exec"
 	"path"
-	"strings"
-	"strconv"
 	"runtime"
-	"encoding/json"
+	"strconv"
+	"strings"
+
 	log "github.com/sirupsen/logrus"
 )
 
@@ -21,10 +22,10 @@ type Repository struct {
 // Repo - a global repository instance
 var Repo = Repository{
 	Packages: make(map[string]Package),
-	Values: make(map[string]string),
+	Values:   make(map[string]string),
 }
 
-// LoadValues - loads values from 
+// LoadValues - loads values from
 func (r *Repository) LoadValues(filename string) {
 	log.WithFields(log.Fields{"From": filename}).Info("Loading values")
 
@@ -54,7 +55,7 @@ func (r *Repository) LoadValues(filename string) {
 // ApplyValues - applies values defined in value files to manifest strings
 func (r *Repository) ApplyValues(d string) string {
 	for k, v := range r.Values {
-		d = strings.ReplaceAll(d, "{" + k + "}" , v)
+		d = strings.ReplaceAll(d, "{"+k+"}", v)
 	}
 	return d
 }
@@ -87,9 +88,9 @@ func (r *Repository) Load() {
 	for name, pkg := range data["packages"].(map[string]interface{}) {
 		name := name
 		pkg := pkg.(map[string]interface{})
-		
+
 		wants := []string{}
-		
+
 		if _, ok := pkg["wants"]; ok {
 			for _, v := range pkg["wants"].([]interface{}) {
 				wants = append(wants, v.(string))
@@ -109,7 +110,7 @@ func (r *Repository) Load() {
 
 		tool := pkg["tool"].(string)
 
-		sd := path.Join(cwd, "airbuild-junk", name + "-source")
+		sd := path.Join(cwd, "airbuild-junk", name+"-source")
 		where := sd
 
 		if w, ok := pkg["where"]; ok {
@@ -119,7 +120,7 @@ func (r *Repository) Load() {
 		bd := where
 
 		if tool == "cmake" || tool == "meson" {
-			bd = path.Join(cwd, "airbuild-junk", name + "-build")
+			bd = path.Join(cwd, "airbuild-junk", name+"-build")
 		}
 
 		var getSteps []Step
@@ -137,6 +138,15 @@ func (r *Repository) Load() {
 					},
 				},
 			}
+		} else if source["type"] == "link" {
+			getSteps = []Step{
+				Step{
+					Wants: []string{},
+					Commands: []string{
+						"ln -s " + source["source"] + " " + sd,
+					},
+				},
+			}
 		}
 
 		var buildSteps []Step
@@ -146,15 +156,15 @@ func (r *Repository) Load() {
 			autogen := path.Join(where, "autogen.sh")
 			configure := path.Join(where, "configure")
 			makefile := path.Join(where, "Makefile")
-			build0lock := path.Join(cwd, "airbuild-prefix", name + ".build0lock")
-			
+			build0lock := path.Join(cwd, "airbuild-prefix", name+".build0lock")
+
 			autogenstep := Step{
 				Wants: []string{autogen},
 				Commands: []string{
 					autogen,
 				},
 			}
-			
+
 			configurestep := Step{
 				Wants: []string{configure},
 				Commands: []string{
@@ -174,7 +184,7 @@ func (r *Repository) Load() {
 				Wants: []string{build0lock},
 				Commands: []string{
 					"make install",
-					"touch " + path.Join(cwd, "airbuild-prefix", name + ".buildlock"),
+					"touch " + path.Join(cwd, "airbuild-prefix", name+".buildlock"),
 				},
 			}
 
@@ -193,8 +203,8 @@ func (r *Repository) Load() {
 		} else if tool == "cmake" {
 			cmakelists := path.Join(where, "CMakeLists.txt")
 			makefile := path.Join(bd, "Makefile")
-			build0lock := path.Join(cwd, "airbuild-prefix", name + ".build0lock")
-			
+			build0lock := path.Join(cwd, "airbuild-prefix", name+".build0lock")
+
 			cmakestep := Step{
 				Wants: []string{cmakelists},
 				Commands: []string{
@@ -206,15 +216,15 @@ func (r *Repository) Load() {
 				Wants: []string{makefile},
 				Commands: []string{
 					"make -j" + strconv.Itoa(cores*2),
-					"touch " + path.Join(cwd, "airbuild-prefix", name + ".build0lock"),
+					"touch " + path.Join(cwd, "airbuild-prefix", name+".build0lock"),
 				},
 			}
-			
+
 			installstep := Step{
 				Wants: []string{build0lock},
 				Commands: []string{
 					"make install",
-					"touch " + path.Join(cwd, "airbuild-prefix", name + ".buildlock"),
+					"touch " + path.Join(cwd, "airbuild-prefix", name+".buildlock"),
 				},
 			}
 
@@ -232,8 +242,8 @@ func (r *Repository) Load() {
 		} else if tool == "meson" {
 			mesonbuild := path.Join(where, "meson.build")
 			buildninja := path.Join(bd, "build.ninja")
-			build0lock := path.Join(cwd, "airbuild-prefix", name + ".build0lock")
-			
+			build0lock := path.Join(cwd, "airbuild-prefix", name+".build0lock")
+
 			mesonstep := Step{
 				Wants: []string{mesonbuild},
 				Commands: []string{
@@ -260,7 +270,7 @@ func (r *Repository) Load() {
 				Wants: []string{build0lock},
 				Commands: []string{
 					"ninja install",
-					"touch " + path.Join(cwd, "airbuild-prefix", name + ".buildlock"),
+					"touch " + path.Join(cwd, "airbuild-prefix", name+".buildlock"),
 				},
 			}
 
@@ -278,17 +288,17 @@ func (r *Repository) Load() {
 		}
 
 		rpkg := Package{
-			Name: name,
-			Wants: wants,
-			Source: source,
-			Tool: tool,
-			Where: where,
-			SourceDir: sd,
-			BuildDir: bd,
-			GetSteps: getSteps,
-			BuildSteps: buildSteps,
+			Name:         name,
+			Wants:        wants,
+			Source:       source,
+			Tool:         tool,
+			Where:        where,
+			SourceDir:    sd,
+			BuildDir:     bd,
+			GetSteps:     getSteps,
+			BuildSteps:   buildSteps,
 			RebuildSteps: rebuildSteps,
-			NoTouch: false,
+			NoTouch:      false,
 		}
 
 		log.WithFields(log.Fields{"Package": name}).Info("New package")
@@ -302,10 +312,10 @@ func runCommand(s string, dir string) {
 	if _, err := os.Stat(dir); os.IsNotExist(err) {
 		os.Mkdir(dir, 0755)
 	}
-	cmd := exec.Command("bash", "-c", "cd " + dir + " && " + s)
+	cmd := exec.Command("bash", "-c", "cd "+dir+" && "+s)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
-	cmd.Stdin  = os.Stdin
+	cmd.Stdin = os.Stdin
 	err := cmd.Run()
 	if err != nil {
 		log.Panic(err)
@@ -316,9 +326,9 @@ func runCommand(s string, dir string) {
 func (r *Repository) Get(name string) {
 	pkg := r.Packages[name]
 	cwd, err := os.Getwd()
-  if err != nil {
-    log.Panic(err)
-  }
+	if err != nil {
+		log.Panic(err)
+	}
 	if _, err := os.Stat(pkg.SourceDir); os.IsNotExist(err) {
 		log.WithFields(log.Fields{"Package": name}).Info("Getting a package")
 		useStep := func(i int, useStep interface{}) {
@@ -331,7 +341,7 @@ func (r *Repository) Get(name string) {
 				return true
 			}
 			if !check() {
-				useStep.(func(int, interface{}))(i-1, useStep);
+				useStep.(func(int, interface{}))(i-1, useStep)
 				if !check() {
 					log.WithFields(log.Fields{"Package": name}).Panic("Cannot get a package")
 				}
@@ -340,14 +350,14 @@ func (r *Repository) Get(name string) {
 				runCommand(cmd, path.Join(cwd, "airbuild-junk"))
 			}
 		}
-		useStep(len(pkg.GetSteps)-1, useStep);
+		useStep(len(pkg.GetSteps)-1, useStep)
 	} else if findInStringSlice(r.Wants, name) && pkg.Source["type"] == "git" {
 		runCommand("git pull", pkg.SourceDir)
 		rev := "master"
 		if rev, ok := pkg.Source["revision"]; ok {
 			rev = rev
 		}
-		runCommand("git checkout " + rev, pkg.SourceDir)
+		runCommand("git checkout "+rev, pkg.SourceDir)
 	}
 }
 
@@ -360,9 +370,9 @@ func (r *Repository) GetAll() {
 
 func findInStringSlice(s []string, v string) bool {
 	for _, a := range s {
-    if a == v {
-      return true
-    }
+		if a == v {
+			return true
+		}
 	}
 	return false
 }
@@ -378,10 +388,10 @@ func (r *Repository) Setup(name string) {
 		r.Setup(w)
 	}
 	cwd, err := os.Getwd()
-  if err != nil {
-    log.Panic(err)
-  }
-	if _, err := os.Stat(path.Join(cwd, "airbuild-prefix", name + ".buildlock")); os.IsNotExist(err) {
+	if err != nil {
+		log.Panic(err)
+	}
+	if _, err := os.Stat(path.Join(cwd, "airbuild-prefix", name+".buildlock")); os.IsNotExist(err) {
 		log.WithFields(log.Fields{"Package": name}).Info("Setting up a package")
 		useStep := func(i int, useStep interface{}) {
 			log.Info(pkg.BuildSteps[i])
@@ -394,7 +404,7 @@ func (r *Repository) Setup(name string) {
 				return true
 			}
 			if !check() {
-				useStep.(func(int, interface{}))(i-1, useStep);
+				useStep.(func(int, interface{}))(i-1, useStep)
 				if !check() {
 					log.WithFields(log.Fields{"Package": name}).Panic("Cannot set up a package")
 				}
@@ -403,7 +413,7 @@ func (r *Repository) Setup(name string) {
 				runCommand(cmd, pkg.BuildDir)
 			}
 		}
-		useStep(len(pkg.BuildSteps)-1, useStep);
+		useStep(len(pkg.BuildSteps)-1, useStep)
 	} else if findInStringSlice(r.Wants, name) {
 		log.WithFields(log.Fields{"Package": name}).Info("(Re)Setting up a package")
 		useStep := func(i int, useStep interface{}) {
