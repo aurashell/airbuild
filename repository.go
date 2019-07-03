@@ -132,8 +132,8 @@ func (r *Repository) Load() {
 
 		if source["type"] == "git" {
 			rev := "master"
-			if rev, ok := source["revision"]; ok {
-				rev = rev
+			if re, ok := source["revision"]; ok {
+				rev = re
 			}
 			getSteps = []Step{
 				Step{
