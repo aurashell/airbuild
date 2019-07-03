@@ -89,6 +89,11 @@ func (r *Repository) Load() {
 		name := name
 		pkg := pkg.(map[string]interface{})
 
+		configureFlags := ""
+		if c, ok := pkg["configure-flags"]; ok {
+			configureFlags = r.ApplyValues(c.(string))
+		}
+
 		wants := []string{}
 
 		if _, ok := pkg["wants"]; ok {
@@ -134,7 +139,7 @@ func (r *Repository) Load() {
 				Step{
 					Wants: []string{},
 					Commands: []string{
-						"git clone " + source["repository"] + " -b " + rev + " " + sd,
+						"git clone " + source["repository"] + " -b " + rev + " " + sd + " --recursive",
 					},
 				},
 			}
@@ -143,7 +148,7 @@ func (r *Repository) Load() {
 				Step{
 					Wants: []string{},
 					Commands: []string{
-						"ln -s " + source["source"] + " " + sd,
+						"ln -f -s " + path.Join(cwd, source["source"]) + " " + sd,
 					},
 				},
 			}
@@ -168,7 +173,7 @@ func (r *Repository) Load() {
 			configurestep := Step{
 				Wants: []string{configure},
 				Commands: []string{
-					configure + " --prefix=" + path.Join(cwd, "airbuild-prefix"),
+					configure + " --prefix=" + path.Join(cwd, "airbuild-prefix") + " " + configureFlags,
 				},
 			}
 
@@ -208,7 +213,7 @@ func (r *Repository) Load() {
 			cmakestep := Step{
 				Wants: []string{cmakelists},
 				Commands: []string{
-					"cmake " + where + " -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=" + path.Join(cwd, "airbuild-prefix"),
+					"cmake " + where + " -DCMAKE_INSTALL_PREFIX=" + path.Join(cwd, "airbuild-prefix") + " " + configureFlags,
 				},
 			}
 
@@ -247,14 +252,14 @@ func (r *Repository) Load() {
 			mesonstep := Step{
 				Wants: []string{mesonbuild},
 				Commands: []string{
-					"meson " + where + " --buildtype=release --prefix " + path.Join(cwd, "airbuild-prefix"),
+					"meson " + where + " --prefix " + path.Join(cwd, "airbuild-prefix") + " " + configureFlags,
 				},
 			}
 
 			remesonstep := Step{
 				Wants: []string{mesonbuild},
 				Commands: []string{
-					"meson --reconfigure . " + where + " --buildtype=release --prefix " + path.Join(cwd, "airbuild-prefix"),
+					"meson --reconfigure . " + where + " --prefix " + path.Join(cwd, "airbuild-prefix") + " " + configureFlags,
 				},
 			}
 
@@ -288,17 +293,18 @@ func (r *Repository) Load() {
 		}
 
 		rpkg := Package{
-			Name:         name,
-			Wants:        wants,
-			Source:       source,
-			Tool:         tool,
-			Where:        where,
-			SourceDir:    sd,
-			BuildDir:     bd,
-			GetSteps:     getSteps,
-			BuildSteps:   buildSteps,
-			RebuildSteps: rebuildSteps,
-			NoTouch:      false,
+			Name:           name,
+			Wants:          wants,
+			Source:         source,
+			Tool:           tool,
+			Where:          where,
+			SourceDir:      sd,
+			BuildDir:       bd,
+			GetSteps:       getSteps,
+			BuildSteps:     buildSteps,
+			RebuildSteps:   rebuildSteps,
+			NoTouch:        false,
+			ConfigureFlags: configureFlags,
 		}
 
 		log.WithFields(log.Fields{"Package": name}).Info("New package")
