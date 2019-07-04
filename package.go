@@ -9,9 +9,11 @@ type Package struct {
 	Where          string
 	SourceDir      string
 	BuildDir       string
+	PrecfgCommands []string
 	GetSteps       []Step
 	BuildSteps     []Step
 	RebuildSteps   []Step
 	NoTouch        bool
 	ConfigureFlags string
+	InstallCopy    map[string]string
 }

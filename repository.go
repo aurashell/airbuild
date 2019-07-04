@@ -124,8 +124,21 @@ func (r *Repository) Load() {
 
 		bd := where
 
-		if tool == "cmake" || tool == "meson" {
+		if tool == "cmake" || tool == "meson" || tool == "gn" {
 			bd = path.Join(cwd, "airbuild-junk", name+"-build")
+		}
+
+		var precfgCommands []string
+
+		if pc, ok := pkg["precfg"]; ok {
+			for _, s := range pc.([]interface{}) {
+				s := s.(string)
+				s = r.ApplyValues(s)
+				s = strings.ReplaceAll(s, "{source}", sd)
+				s = strings.ReplaceAll(s, "{build}", bd)
+				s = strings.ReplaceAll(s, "{where}", where)
+				precfgCommands = append(precfgCommands, s)
+			}
 		}
 
 		var getSteps []Step
@@ -139,7 +152,7 @@ func (r *Repository) Load() {
 				Step{
 					Wants: []string{},
 					Commands: []string{
-						"git clone " + source["repository"] + " -b " + rev + " " + sd + " --recursive",
+						"git clone " + source["repository"] + " -b " + rev + " " + sd + " --recursive --depth 1",
 					},
 				},
 			}
@@ -290,6 +303,44 @@ func (r *Repository) Load() {
 				ninjastep,
 				installstep,
 			}
+		} else if tool == "gn" {
+			buildgn := path.Join(where, "BUILD.gn")
+			buildninja := path.Join(bd, "build.ninja")
+
+			gngenstep := Step{
+				Wants: []string{buildgn},
+				Commands: []string{
+					"cd " + where + "; gn gen " + bd + " --args='" + configureFlags + "'",
+				},
+			}
+
+			ninjastep := Step{
+				Wants: []string{buildninja},
+				Commands: []string{
+					"ninja",
+					"touch " + path.Join(cwd, "airbuild-prefix", name+".buildlock"),
+				},
+			}
+
+			buildSteps = []Step{
+				gngenstep,
+				ninjastep,
+			}
+
+			rebuildSteps = []Step{
+				ninjastep,
+			}
+		}
+
+		installCopy := map[string]string{}
+
+		if ic, ok := pkg["install-copy"]; ok {
+			for k, v := range ic.(map[string]interface{}) {
+				k = strings.ReplaceAll(k, "{source}", sd)
+				k = strings.ReplaceAll(k, "{build}", bd)
+				k = strings.ReplaceAll(k, "{where}", where)
+				installCopy[k] = v.(string)
+			}
 		}
 
 		rpkg := Package{
@@ -300,11 +351,13 @@ func (r *Repository) Load() {
 			Where:          where,
 			SourceDir:      sd,
 			BuildDir:       bd,
+			PrecfgCommands: precfgCommands,
 			GetSteps:       getSteps,
 			BuildSteps:     buildSteps,
 			RebuildSteps:   rebuildSteps,
 			NoTouch:        false,
 			ConfigureFlags: configureFlags,
+			InstallCopy:    installCopy,
 		}
 
 		log.WithFields(log.Fields{"Package": name}).Info("New package")
@@ -398,6 +451,9 @@ func (r *Repository) Setup(name string) {
 		log.Panic(err)
 	}
 	if _, err := os.Stat(path.Join(cwd, "airbuild-prefix", name+".buildlock")); os.IsNotExist(err) {
+		for _, c := range pkg.PrecfgCommands {
+			runCommand(c, pkg.SourceDir)
+		}
 		log.WithFields(log.Fields{"Package": name}).Info("Setting up a package")
 		useStep := func(i int, useStep interface{}) {
 			log.Info(pkg.BuildSteps[i])
@@ -441,6 +497,13 @@ func (r *Repository) Setup(name string) {
 		for s := range pkg.RebuildSteps {
 			useStep(s, useStep)
 		}
+	}
+	for s, d := range pkg.InstallCopy {
+		jd := path.Join(cwd, "airbuild-prefix", d)
+		if _, err := os.Stat(jd); os.IsNotExist(err) {
+			os.MkdirAll(jd, 0755)
+		}
+		runCommand("install "+s+" "+jd, pkg.BuildDir)
 	}
 }
 
