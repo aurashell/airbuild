@@ -89,11 +89,6 @@ func (r *Repository) Load() {
 		name := name
 		pkg := pkg.(map[string]interface{})
 
-		configureFlags := ""
-		if c, ok := pkg["configure-flags"]; ok {
-			configureFlags = r.ApplyValues(c.(string))
-		}
-
 		wants := []string{}
 
 		if _, ok := pkg["wants"]; ok {
@@ -123,6 +118,14 @@ func (r *Repository) Load() {
 		}
 
 		bd := where
+
+		configureFlags := ""
+		if c, ok := pkg["configure-flags"]; ok {
+			c := strings.ReplaceAll(c.(string), "{source}", sd)
+			c = strings.ReplaceAll(c, "{build}", bd)
+			c = strings.ReplaceAll(c, "{where}", where)
+			configureFlags = r.ApplyValues(c)
+		}
 
 		if tool == "cmake" || tool == "meson" || tool == "gn" {
 			bd = path.Join(cwd, "airbuild-junk", name+"-build")
@@ -413,8 +416,8 @@ func (r *Repository) Get(name string) {
 	} else if findInStringSlice(r.Wants, name) && pkg.Source["type"] == "git" {
 		runCommand("git pull", pkg.SourceDir)
 		rev := "master"
-		if rev, ok := pkg.Source["revision"]; ok {
-			rev = rev
+		if r, ok := pkg.Source["revision"]; ok {
+			rev = r
 		}
 		runCommand("git checkout "+rev, pkg.SourceDir)
 	}
