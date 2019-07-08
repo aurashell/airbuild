@@ -119,11 +119,14 @@ func (r *Repository) Load() {
 
 		bd := where
 
+		id := path.Join(cwd, "airbuild-prefix")
+
 		configureFlags := ""
 		if c, ok := pkg["configure-flags"]; ok {
 			c := strings.ReplaceAll(c.(string), "{source}", sd)
 			c = strings.ReplaceAll(c, "{build}", bd)
 			c = strings.ReplaceAll(c, "{where}", where)
+			c = strings.ReplaceAll(c, "{install}", id)
 			configureFlags = r.ApplyValues(c)
 		}
 
@@ -140,6 +143,7 @@ func (r *Repository) Load() {
 				s = strings.ReplaceAll(s, "{source}", sd)
 				s = strings.ReplaceAll(s, "{build}", bd)
 				s = strings.ReplaceAll(s, "{where}", where)
+				s = strings.ReplaceAll(s, "{install}", id)
 				precfgCommands = append(precfgCommands, s)
 			}
 		}
@@ -333,6 +337,19 @@ func (r *Repository) Load() {
 			rebuildSteps = []Step{
 				ninjastep,
 			}
+		} else if tool == "gradle" {
+			gradlew := path.Join(where, "gradlew")
+
+			gradlewstep := Step{
+				Wants: []string{gradlew},
+				Commands: []string{
+					"./gradlew build",
+					"touch " + path.Join(cwd, "airbuild-prefix", name+".buildlock"),
+				},
+			}
+
+			buildSteps = []Step{gradlewstep}
+			rebuildSteps = []Step{gradlewstep}
 		}
 
 		installCopy := map[string]string{}
@@ -342,6 +359,7 @@ func (r *Repository) Load() {
 				k = strings.ReplaceAll(k, "{source}", sd)
 				k = strings.ReplaceAll(k, "{build}", bd)
 				k = strings.ReplaceAll(k, "{where}", where)
+				k = strings.ReplaceAll(k, "{install}", id)
 				installCopy[k] = v.(string)
 			}
 		}
