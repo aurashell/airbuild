@@ -130,7 +130,7 @@ func (r *Repository) Load() {
 			configureFlags = r.ApplyValues(c)
 		}
 
-		if tool == "cmake" || tool == "meson" || tool == "gn" {
+		if tool == "cmake" || tool == "meson" || tool == "gn" || tool == "custom" {
 			bd = path.Join(cwd, "airbuild-junk", name+"-build")
 		}
 
@@ -169,6 +169,23 @@ func (r *Repository) Load() {
 					Wants: []string{},
 					Commands: []string{
 						"ln -f -s " + path.Join(cwd, source["source"]) + " " + sd,
+					},
+				},
+			}
+		} else if source["type"] == "tar" {
+			tarfile := path.Join(cwd, "airbuild-junk", path.Base(source["url"]))
+			getSteps = []Step{
+				Step{
+					Wants: []string{},
+					Commands: []string{
+						"wget " + source["url"] + " -O" + tarfile,
+					},
+				},
+				Step{
+					Wants: []string{tarfile},
+					Commands: []string{
+						"mkdir -p " + sd,
+						"tar --strip-components=1 -xvf " + tarfile + " -C " + sd,
 					},
 				},
 			}
@@ -350,6 +367,39 @@ func (r *Repository) Load() {
 
 			buildSteps = []Step{gradlewstep}
 			rebuildSteps = []Step{gradlewstep}
+		} else if tool == "custom" || tool == "custom-insource" {
+			makeStep := func(data map[string]interface{}) Step {
+				prep := func(s string) string {
+					s = r.ApplyValues(s)
+					s = strings.ReplaceAll(s, "{source}", sd)
+					s = strings.ReplaceAll(s, "{build}", bd)
+					s = strings.ReplaceAll(s, "{where}", where)
+					s = strings.ReplaceAll(s, "{install}", id)
+					s = strings.ReplaceAll(s, "{build0lock}", path.Join(cwd, "airbuild-prefix", name+".build0lock"))
+					s = strings.ReplaceAll(s, "{buildlock}", path.Join(cwd, "airbuild-prefix", name+".buildlock"))
+					s = strings.ReplaceAll(s, "{cores}", strconv.Itoa(cores))
+					s = strings.ReplaceAll(s, "{coresx2}", strconv.Itoa(cores*2))
+					return s
+				}
+				s := Step{}
+				for _, w := range data["wants"].([]interface{}) {
+					s.Wants = append(s.Wants, prep(w.(string)))
+				}
+				for _, c := range data["commands"].([]interface{}) {
+					s.Commands = append(s.Commands, prep(c.(string)))
+				}
+				return s
+			}
+			if bs, ok := pkg["build-steps"]; ok {
+				for _, data := range bs.([]interface{}) {
+					buildSteps = append(buildSteps, makeStep(data.(map[string]interface{})))
+				}
+			}
+			if rs, ok := pkg["rebuild-steps"]; ok {
+				for _, data := range rs.([]interface{}) {
+					rebuildSteps = append(rebuildSteps, makeStep(data.(map[string]interface{})))
+				}
+			}
 		}
 
 		installCopy := map[string]string{}
