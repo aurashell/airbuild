@@ -10,6 +10,8 @@ It creates an installation prefix, downloads packages, builds them using their b
 $ go get github.com/aurashell/airwheel
 ```
 
+Or you can just use a Docker image.
+
 ## Using AirBuild
 
 First, create a file called `airbuild.json` similar to the one below:
@@ -67,12 +69,22 @@ $ airbuild [value-files.json...]
 
 You will find build data in `airbuild-junk` directory and your install prefix at `airbuild-prefix`.
 
+Running from docker can be done as shown below:
+
+```bash
+$ docker run -P -v $PWD:/usr/src/app aurashell/airbuild airbuild [value-files.json...]
+```
+
 ## Supported tools
 
 * `cmake`
 * `meson`
 * `autotools`
+* `gn`
+* `custom-insource`
+* `custom` (with a build dir)
 
 ## Supported sources
 
 * `git`
+* `tar`
