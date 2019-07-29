@@ -121,6 +121,17 @@ func (r *Repository) Load() {
 
 		id := path.Join(cwd, "airbuild-prefix")
 
+		j := path.Dir(path.Join(cwd, "airbuild-junk", name))
+		p := path.Dir(path.Join(cwd, "airbuild-prefix", name))
+
+		if _, err := os.Stat(j); os.IsNotExist(err) {
+			os.Mkdir(j, os.FileMode(0755))
+		}
+
+		if _, err := os.Stat(p); os.IsNotExist(err) {
+			os.Mkdir(p, os.FileMode(0755))
+		}
+
 		configureFlags := ""
 		if c, ok := pkg["configure-flags"]; ok {
 			c := strings.ReplaceAll(c.(string), "{source}", sd)
