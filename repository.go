@@ -170,7 +170,8 @@ func (r *Repository) Load() {
 				Step{
 					Wants: []string{},
 					Commands: []string{
-						"git clone " + source["repository"] + " -b " + rev + " " + sd + " --recursive --depth 1",
+						"git clone " + source["repository"] + " " + sd + " --recursive --depth 1",
+						"git checkout " + rev,
 					},
 				},
 			}
