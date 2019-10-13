@@ -171,7 +171,7 @@ func (r *Repository) Load() {
 					Wants: []string{},
 					Commands: []string{
 						"git clone " + source["repository"] + " " + sd + " --recursive --depth 1",
-						"git checkout " + rev,
+						"cd " + sd + " && git checkout " + rev,
 					},
 				},
 			}
