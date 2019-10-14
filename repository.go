@@ -163,9 +163,9 @@ func (r *Repository) Load() {
 
 		var depth string
 		if (source["revision"] == "") || (source["revision"] == "master") {
-			depth = ""
-		} else {
 			depth = "--depth 1"
+		} else {
+			depth = ""
 		}
 
 		if source["type"] == "git" {
@@ -236,7 +236,7 @@ func (r *Repository) Load() {
 			makestep := Step{
 				Wants: []string{makefile},
 				Commands: []string{
-					"make -j" + strconv.Itoa(cores*2),
+					"cd " + where + " && make -j" + strconv.Itoa(cores*2),
 					"touch " + build0lock,
 				},
 			}
@@ -244,7 +244,7 @@ func (r *Repository) Load() {
 			installstep := Step{
 				Wants: []string{build0lock},
 				Commands: []string{
-					"make install",
+					"cd " + where + " && make install",
 					"touch " + path.Join(cwd, "airbuild-prefix", name+".buildlock"),
 				},
 			}
