@@ -161,6 +161,13 @@ func (r *Repository) Load() {
 
 		var getSteps []Step
 
+		var depth string
+		if (source["revision"] == "") || (source["revision"] == "master") {
+			depth = ""
+		} else {
+			depth = "--depth 1"
+		}
+
 		if source["type"] == "git" {
 			rev := "master"
 			if re, ok := source["revision"]; ok {
@@ -170,7 +177,7 @@ func (r *Repository) Load() {
 				Step{
 					Wants: []string{},
 					Commands: []string{
-						"git clone " + source["repository"] + " " + sd + " --recursive --depth 1",
+						"git clone " + source["repository"] + " " + sd + " --recursive " + depth,
 						"cd " + sd + " && git checkout " + rev,
 					},
 				},
