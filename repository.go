@@ -249,6 +249,15 @@ func (r *Repository) Load() {
 				},
 			}
 
+			if _, ok := pkg["no-install"]; ok {
+				installstep = Step{
+					Wants: []string{build0lock},
+					Commands: []string{
+						"touch " + path.Join(cwd, "airbuild-prefix", name+".buildlock"),
+					},
+				}
+			}
+
 			buildSteps = []Step{
 				autogenstep,
 				configurestep,
@@ -287,6 +296,15 @@ func (r *Repository) Load() {
 					"make install",
 					"touch " + path.Join(cwd, "airbuild-prefix", name+".buildlock"),
 				},
+			}
+
+			if _, ok := pkg["no-install"]; ok {
+				installstep = Step{
+					Wants: []string{build0lock},
+					Commands: []string{
+						"touch " + path.Join(cwd, "airbuild-prefix", name+".buildlock"),
+					},
+				}
 			}
 
 			buildSteps = []Step{
@@ -333,6 +351,15 @@ func (r *Repository) Load() {
 					"ninja install",
 					"touch " + path.Join(cwd, "airbuild-prefix", name+".buildlock"),
 				},
+			}
+
+			if _, ok := pkg["no-install"]; ok {
+				installstep = Step{
+					Wants: []string{build0lock},
+					Commands: []string{
+						"touch " + path.Join(cwd, "airbuild-prefix", name+".buildlock"),
+					},
+				}
 			}
 
 			buildSteps = []Step{
